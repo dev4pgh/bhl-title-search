@@ -9,6 +9,49 @@ app = FastAPI(title="BHL Title Search")
 BHL_API_URL = "https://www.biodiversitylibrary.org/api3"
 
 
+def get_bhl_api_key() -> str:
+    api_key = os.getenv("BHL_API_KEY", "").strip()
+
+    if not api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="BHL_API_KEY is not configured.",
+        )
+
+    return api_key
+
+
+async def bhl_get(
+    client: httpx.AsyncClient,
+    params: dict[str, Any],
+    error_message: str = "BHL API returned an error.",
+) -> dict[str, Any]:
+    request_params = {
+        **params,
+        "format": "json",
+        "apikey": get_bhl_api_key(),
+    }
+
+    try:
+        response = await client.get(BHL_API_URL, params=request_params)
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Could not reach BHL API: {exc}",
+        )
+
+    data: dict[str, Any] = response.json()
+
+    if data.get("Status") != "ok":
+        raise HTTPException(
+            status_code=502,
+            detail=data.get("ErrorMessage") or error_message,
+        )
+
+    return data
+
+
 @app.get("/")
 def home():
     return {
@@ -32,39 +75,16 @@ def api_ping():
 async def bhl_title(
     title_id: int = Query(..., description="BHL title/publication ID"),
 ):
-    api_key = os.getenv("BHL_API_KEY")
-
-    if not api_key:
-        raise HTTPException(
-            status_code=500,
-            detail="BHL_API_KEY is not configured.",
-        )
-
-    params = {
-        "op": "GetTitleMetadata",
-        "id": title_id,
-        "idtype": "bhl",
-        "items": "t",
-        "format": "json",
-        "apikey": api_key,
-    }
-
-    try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            response = await client.get(BHL_API_URL, params=params)
-            response.raise_for_status()
-    except httpx.HTTPError as exc:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Could not reach BHL API: {exc}",
-        )
-
-    data: dict[str, Any] = response.json()
-
-    if data.get("Status") != "ok":
-        raise HTTPException(
-            status_code=502,
-            detail=data.get("ErrorMessage") or "BHL API returned an error.",
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        data = await bhl_get(
+            client,
+            {
+                "op": "GetTitleMetadata",
+                "id": title_id,
+                "idtype": "bhl",
+                "items": "t",
+            },
+            error_message="BHL API returned an error while fetching the title.",
         )
 
     result = data.get("Result") or []
@@ -97,38 +117,15 @@ async def bhl_page_search(
     item_id: int = Query(..., description="BHL item/volume ID"),
     text: str = Query(..., min_length=1, description="Text to search for"),
 ):
-    api_key = os.getenv("BHL_API_KEY")
-
-    if not api_key:
-        raise HTTPException(
-            status_code=500,
-            detail="BHL_API_KEY is not configured.",
-        )
-
-    params = {
-        "op": "PageSearch",
-        "itemid": item_id,
-        "text": text,
-        "format": "json",
-        "apikey": api_key,
-    }
-
-    try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            response = await client.get(BHL_API_URL, params=params)
-            response.raise_for_status()
-    except httpx.HTTPError as exc:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Could not reach BHL API: {exc}",
-        )
-
-    data: dict[str, Any] = response.json()
-
-    if data.get("Status") != "ok":
-        raise HTTPException(
-            status_code=502,
-            detail=data.get("ErrorMessage") or "BHL API returned an error.",
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        data = await bhl_get(
+            client,
+            {
+                "op": "PageSearch",
+                "itemid": item_id,
+                "text": text,
+            },
+            error_message="BHL API returned an error while searching the item.",
         )
 
     pages = data.get("Result") or []
@@ -150,84 +147,46 @@ async def bhl_title_first_item_search(
     title_id: int = Query(..., description="HBL title/publication ID"),
     text: str = Query(..., min_length=1, description="Text to search for"),
 ):
-    api_key = os.getenv("BHL_API_KEY")
-
-    if not api_key:
-        raise HTTPException(
-            status_code=500,
-            detail="BHL_API_KEY is not configured.",
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        title_data = await bhl_get(
+            client,
+            {
+                "op": "GetTitleMetadata",
+                "id": title_id,
+                "idtype": "bhl",
+                "items": "t",
+            },
+            error_message="BHL API returned an error while fetching the title.",
         )
 
-    title_params = {
-        "op": "GetTitleMetadata",
-        "id": title_id,
-        "idtype": "bhl",
-        "items": "t",
-        "format": "json",
-        "apikey": api_key,
-    }
+        title_results = title_data.get("Result") or []
 
-    try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            title_response = await client.get(BHL_API_URL, params=title_params)
-            title_response.raise_for_status()
+        if not title_results:
+            raise HTTPException(
+                status_code=404,
+                detail="No BHL title found for that title_id.",
+            )
 
-            title_data: dict[str, Any] = title_response.json()
+        title = title_results[0]
+        items = title.get("Items") or []
 
-            if title_data.get("Status") != "ok":
-                raise HTTPException(
-                    status_code=502,
-                    detail=title_data.get("ErrorMessage")
-                    or "BHL API returned an error while fetching the title.",
-                )
+        if not items:
+            raise HTTPException(
+                status_code=404,
+                detail="That BHL title has no associated items.",
+            )
 
-            title_results = title_data.get("Result") or []
+        first_item = items[0]
+        item_id = first_item.get("ItemID")
 
-            if not title_results:
-                raise HTTPException(
-                    status_code=404,
-                    detail="No BHL title found for that title_id.",
-                )
-
-            title = title_results[0]
-            items = title.get("Items") or []
-
-            if not items:
-                raise HTTPException(
-                    status_code=404,
-                    detail="That BHL title has no associated items.",
-                )
-
-            first_item = items[0]
-            item_id = first_item.get("ItemID")
-
-            page_search_params = {
+        page_search_data = await bhl_get(
+            client,
+            {
                 "op": "PageSearch",
                 "itemid": item_id,
                 "text": text,
-                "format": "json",
-                "apikey": api_key,
-            }
-
-            page_search_response = await client.get(
-                BHL_API_URL,
-                params=page_search_params,
-            )
-            page_search_response.raise_for_status()
-
-    except httpx.HTTPError as exc:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Could not reach BHL API: {exc}",
-        )
-
-    page_search_data: dict[str, Any] = page_search_response.json()
-
-    if page_search_data.get("Status") != "ok":
-        raise HTTPException(
-            status_code=502,
-            detail=page_search_data.get("ErrorMessage")
-            or "BHL API returned an error while searching the first item.",
+            },
+            error_message="BHL API returned an error while searching the first item.",
         )
 
     pages = page_search_data.get("Result") or []
