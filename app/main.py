@@ -52,6 +52,53 @@ async def bhl_get(
     return data
 
 
+async def get_title_with_items(
+    client: httpx.AsyncClient,
+    title_id: int,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    data = await bhl_get(
+        client,
+        {
+            "op": "GetTitleMetadata",
+            "id": title_id,
+            "idtype": "bhl",
+            "items": "t",
+        },
+        error_message="BHL API returned an error while fetching the title.",
+    )
+
+    results = data.get("Result") or []
+
+    if not results:
+        raise HTTPException(
+            status_code=404,
+            detail="No BHL title found for that title_id.",
+        )
+
+    title = results[0]
+    items = title.get("Items") or []
+
+    return title, items
+
+
+async def search_item_pages(
+    client: httpx.AsyncClient,
+    item_id: int,
+    text: str,
+) -> list[dict[str, Any]]:
+    data = await bhl_get(
+        client,
+        {
+            "op": "PageSearch",
+            "itemid": item_id,
+            "text": text,
+        },
+        error_message="BHL API returned an error while searching the item.",
+    )
+
+    return data.get("Result") or []
+
+
 @app.get("/")
 def home():
     return {
@@ -76,27 +123,7 @@ async def bhl_title(
     title_id: int = Query(..., description="BHL title/publication ID"),
 ):
     async with httpx.AsyncClient(timeout=20.0) as client:
-        data = await bhl_get(
-            client,
-            {
-                "op": "GetTitleMetadata",
-                "id": title_id,
-                "idtype": "bhl",
-                "items": "t",
-            },
-            error_message="BHL API returned an error while fetching the title.",
-        )
-
-    result = data.get("Result") or []
-
-    if not result:
-        raise HTTPException(
-            status_code=404,
-            detail="No BHL title found for that title_id.",
-        )
-
-    title = result[0]
-    items = title.get("Items") or []
+        title, items = await get_title_with_items(client, title_id)
 
     return {
         "ok": True,
@@ -118,17 +145,7 @@ async def bhl_page_search(
     text: str = Query(..., min_length=1, description="Text to search for"),
 ):
     async with httpx.AsyncClient(timeout=20.0) as client:
-        data = await bhl_get(
-            client,
-            {
-                "op": "PageSearch",
-                "itemid": item_id,
-                "text": text,
-            },
-            error_message="BHL API returned an error while searching the item.",
-        )
-
-    pages = data.get("Result") or []
+        pages = await search_item_pages(client, item_id, text)
 
     return {
         "ok": True,
@@ -144,31 +161,11 @@ async def bhl_page_search(
 
 @app.get("/api/bhl-title-first-item-search")
 async def bhl_title_first_item_search(
-    title_id: int = Query(..., description="HBL title/publication ID"),
+    title_id: int = Query(..., description="BHL title/publication ID"),
     text: str = Query(..., min_length=1, description="Text to search for"),
 ):
     async with httpx.AsyncClient(timeout=20.0) as client:
-        title_data = await bhl_get(
-            client,
-            {
-                "op": "GetTitleMetadata",
-                "id": title_id,
-                "idtype": "bhl",
-                "items": "t",
-            },
-            error_message="BHL API returned an error while fetching the title.",
-        )
-
-        title_results = title_data.get("Result") or []
-
-        if not title_results:
-            raise HTTPException(
-                status_code=404,
-                detail="No BHL title found for that title_id.",
-            )
-
-        title = title_results[0]
-        items = title.get("Items") or []
+        title, items = await get_title_with_items(client, title_id)
 
         if not items:
             raise HTTPException(
@@ -178,18 +175,7 @@ async def bhl_title_first_item_search(
 
         first_item = items[0]
         item_id = first_item.get("ItemID")
-
-        page_search_data = await bhl_get(
-            client,
-            {
-                "op": "PageSearch",
-                "itemid": item_id,
-                "text": text,
-            },
-            error_message="BHL API returned an error while searching the first item.",
-        )
-
-    pages = page_search_data.get("Result") or []
+        pages = await search_item_pages(client, item_id, text)
 
     return {
         "ok": True,
@@ -208,7 +194,7 @@ async def bhl_title_first_item_search(
             "item_id": item_id,
             "volume": first_item.get("Volume"),
             "year": first_item.get("Year"),
-            "item_url": first_item.get("ItemURL"),
+            "item_url": first_item.get("ItemUrl"),
         },
         "available_item_count": len(items),
         "match_count": len(pages),
