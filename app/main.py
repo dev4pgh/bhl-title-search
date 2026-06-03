@@ -1,3 +1,4 @@
+import asyncio
 import os
 from typing import Any
 
@@ -35,10 +36,24 @@ async def bhl_get(
     try:
         response = await client.get(BHL_API_URL, params=request_params)
         response.raise_for_status()
-    except httpx.HTTPError as exc:
+    except httpx.HTTPStatusError as exc:
+        response = exc.response
+
         raise HTTPException(
             status_code=502,
-            detail=f"Could not reach BHL API: {exc}",
+            detail={
+                "message": "BHL API request failed.",
+                "upstream_status_code": response.status_code,
+                "upstream_reason": response.reason_phrase,
+                "retry_after": response.headers.get("retry-after"),
+            },
+        )
+    except httpx.RequestError:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "Could not connect to BHL API.",
+            },
         )
 
     data: dict[str, Any] = response.json()
@@ -50,6 +65,10 @@ async def bhl_get(
         )
 
     return data
+
+
+async def polite_bhl_pause() -> None:
+    await asyncio.sleep(1.0)
 
 
 async def get_title_with_items(
@@ -199,4 +218,66 @@ async def bhl_title_first_item_search(
         "available_item_count": len(items),
         "match_count": len(pages),
         "first_pages": pages[:5],
+    }
+
+
+@app.get("/api/bhl-title-search")
+async def bhl_title_search(
+    title_id: int = Query(..., description="BHL title/publication ID"),
+    text: str = Query(..., min_length=1, description="Text to search for"),
+):
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        title, items = await get_title_with_items(client, title_id)
+
+        if not items:
+            raise HTTPException(
+                status_code=404,
+                detail="That BHL title has no associated items.",
+            )
+
+        matching_items = []
+
+        for index, item in enumerate(items):
+            item_id = item.get("ItemID")
+
+            if not item_id:
+                continue
+
+            if index > 0:
+                await polite_bhl_pause()
+
+            pages = await search_item_pages(client, item_id, text)
+
+            if not pages:
+                continue
+
+            matching_items.append(
+                {
+                    "item_id": item_id,
+                    "volume": item.get("Volume"),
+                    "year": item.get("Year"),
+                    "item_url": item.get("ItemUrl"),
+                    "match_count": len(pages),
+                    "first_pages": pages[:5],
+                }
+            )
+
+    return {
+        "ok": True,
+        "source": "bhl",
+        "mode": "all_items_sequential",
+        "query": {
+            "title_id": title_id,
+            "text": text,
+        },
+        "title": {
+            "title_id": title.get("TitleID"),
+            "full_title": title.get("FullTitle"),
+            "title_url": title.get("TitleUrl"),
+        },
+        "available_item_count": len(items),
+        "searched_item_count": len(items),
+        "matching_item_count": len(matching_items),
+        "total_matches": sum(item["match_count"] for item in matching_items),
+        "matching_items": matching_items,
     }
