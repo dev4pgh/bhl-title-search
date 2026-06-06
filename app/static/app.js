@@ -36,6 +36,38 @@ function createExternalLink(url, text) {
   return link;
 }
 
+function appendHighlightedText(parent, text, searchText) {
+  if (!text || !searchText) {
+    parent.textContent = text || "";
+    return;
+  }
+
+  const lowerText = text.toLowerCase();
+  const lowerSearchText = searchText.toLowerCase();
+
+  let cursor = 0;
+  let matchIndex = lowerText.indexOf(lowerSearchText);
+
+  while (matchIndex !== -1) {
+    if (matchIndex > cursor) {
+      parent.appendChild(
+        document.createTextNode(text.slice(cursor, matchIndex))
+      );
+    }
+
+    const mark = document.createElement("mark");
+    mark.textContent = text.slice(matchIndex, matchIndex + searchText.length);
+    parent.appendChild(mark);
+
+    cursor = matchIndex + searchText.length;
+    matchIndex = lowerText.indexOf(lowerSearchText, cursor);
+  }
+
+  if (cursor < text.length) {
+    parent.appendChild(document.createTextNode(text.slice(cursor)));
+  }
+}
+
 function createPageList(pages) {
   const list = document.createElement("ul");
   list.className = "list-group list-group-flush";
@@ -82,7 +114,7 @@ function createPageList(pages) {
     if (page.snippet) {
         const snippet = document.createElement("p");
         snippet.className = "mt-2 mb-0 small text-body-secondary";
-        snippet.textContent = page.snippet;
+        appendHighlightedText(snippet, page.snippet, page.search_text);
         item.appendChild(snippet);
     }
   }

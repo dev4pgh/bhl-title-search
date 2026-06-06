@@ -217,6 +217,7 @@ def format_page_result(page: dict[str, Any], search_text: str) -> dict[str, Any]
         "thumbnail_url": page.get("ThumbnailUrl"),
         "image_url": page.get("FullSizeImageUrl"),
         "snippet": make_snippet(page.get("OcrText"), search_text),
+        "search_text": search_text,
     }
 
 
