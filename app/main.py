@@ -6,10 +6,12 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 app = FastAPI(title="BHL Title Search")
 templates = Jinja2Templates(directory="app/templates")
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 BHL_API_URL = "https://www.biodiversitylibrary.org/api3"
 
