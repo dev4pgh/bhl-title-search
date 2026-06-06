@@ -1,5 +1,7 @@
 import asyncio
 import os
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import Any
 
 import httpx
@@ -8,6 +10,27 @@ from fastapi import FastAPI, HTTPException, Query
 app = FastAPI(title="BHL Title Search")
 
 BHL_API_URL = "https://www.biodiversitylibrary.org/api3"
+
+
+def retry_after_seconds(value: str | None) -> float | None:
+    if not value:
+        return None
+
+    value = value.strip()
+
+    if value.isdigit():
+        return float(value)
+
+    try:
+        retry_at = parsedate_to_datetime(value)
+
+        if retry_at.tzinfo is None:
+            retry_at = retry_at.replace(tzinfo=timezone.utc)
+
+        now = datetime.now(timezone.utc)
+        return max((retry_at - now).total_seconds(), 0.0)
+    except (TypeError, ValueError):
+        return None
 
 
 def get_bhl_api_key() -> str:
@@ -33,42 +56,61 @@ async def bhl_get(
         "apikey": get_bhl_api_key(),
     }
 
-    try:
-        response = await client.get(BHL_API_URL, params=request_params)
-        response.raise_for_status()
-    except httpx.HTTPStatusError as exc:
-        response = exc.response
+    max_attempts = 3
 
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "message": "BHL API request failed.",
-                "upstream_status_code": response.status_code,
-                "upstream_reason": response.reason_phrase,
-                "retry_after": response.headers.get("retry-after"),
-            },
-        )
-    except httpx.RequestError:
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "message": "Could not connect to BHL API.",
-            },
-        )
+    for attempt in range(1, max_attempts + 1):
+        try:
+            response = await client.get(BHL_API_URL, params=request_params)
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            response = exc.response
 
-    data: dict[str, Any] = response.json()
+            if response.status_code == 429 and attempt < max_attempts:
+                retry_after = retry_after_seconds(response.headers.get("retry-after"))
 
-    if data.get("Status") != "ok":
-        raise HTTPException(
-            status_code=502,
-            detail=data.get("ErrorMessage") or error_message,
-        )
+                if retry_after is None:
+                    retry_after = float(2 ** (attempt - 1))
 
-    return data
+                await asyncio.sleep(retry_after)
+                continue
+
+            raise HTTPException(
+                status_code=502,
+                detail={
+                    "message": "BHL API request failed.",
+                    "upstream_status_code": response.status_code,
+                    "upstream_reason": response.reason_phrase,
+                    "retry_after": response.headers.get("retry-after"),
+                },
+            )
+        except httpx.RequestError:
+            raise HTTPException(
+                status_code=502,
+                detail={
+                    "message": "Could not connect to BHL API.",
+                },
+            )
+
+        data: dict[str, Any] = response.json()
+
+        if data.get("Status") != "ok":
+            raise HTTPException(
+                status_code=502,
+                detail=data.get("ErrorMessage") or error_message,
+            )
+
+        return data
+
+    raise HTTPException(
+        status_code=502,
+        detail={
+            "message": "BHL API request failed after retrying.",
+        },
+    )
 
 
 async def polite_bhl_pause() -> None:
-    await asyncio.sleep(1.0)
+    await asyncio.sleep(0.25)
 
 
 async def get_title_with_items(
