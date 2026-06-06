@@ -2,10 +2,18 @@ const form = document.querySelector("#search-form");
 const statusEl = document.querySelector("#status");
 const resultsEl = document.querySelector("#results");
 const searchButton = document.querySelector("#search-button");
+const searchSpinner = document.querySelector("#search-spinner");
+const searchButtonText = document.querySelector("#search-button-text");
 
 function setStatus(message, type) {
   statusEl.textContent = message;
   statusEl.className = `alert alert-${type}`;
+}
+
+function setLoading(isLoading) {
+  searchButton.disabled = isLoading;
+  searchSpinner.classList.toggle("d-none", !isLoading);
+  searchButtonText.textContent = isLoading ? "Searching..." : "Search";
 }
 
 function clearResults() {
@@ -166,7 +174,7 @@ form.addEventListener("submit", async (event) => {
   const formData = new FormData(form);
   const params = new URLSearchParams(formData);
 
-  searchButton.disabled = true;
+  setLoading(true);
   setStatus("Searching BHL...", "info");
   clearResults();
   appendEmptyMessage("Searching. Large titles may take a while.");
@@ -193,6 +201,6 @@ form.addEventListener("submit", async (event) => {
     clearResults();
     appendEmptyMessage(String(error));
   } finally {
-    searchButton.disabled = false;
+    setLoading(false);
   }
 });

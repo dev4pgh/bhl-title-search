@@ -36,13 +36,15 @@
                             </div>
 
                             <button id="search-button" type="submit" class="btn btn-primary">
-                                Search
+                                <span id="search-spinner" class="spinner-border spinner-border-sm me-2 d-none"
+                                    aria-hidden="true"></span>
+                                <span id="search-button-text">Search</span>
                             </button>
                         </form>
                     </div>
                 </div>
 
-                <div id="status" class="alert alert-secondary" role="status">
+                <div id="status" class="alert alert-secondary" role="status" aria-live="polite">
                     Submit a search to see results.
                 </div>
 
