@@ -8,6 +8,8 @@ const titleLookupForm = document.querySelector("#title-lookup-form");
 const titleLookupResultsEl = document.querySelector("#title-lookup-results");
 const titleLookupButton = document.querySelector("#title-lookup-button");
 const titleIdInput = document.querySelector("#title-id");
+const selectedTitleHeading = document.querySelector("#selected-title-heading");
+const selectedTitleSummary = document.querySelector("#selected-title-summary");
 
 function setStatus(message, type) {
   statusEl.textContent = message;
@@ -260,7 +262,13 @@ function createTitleCandidateButton(candidate) {
 
   button.addEventListener("click", () => {
     titleIdInput.value = candidate.title_id;
-    setStatus(`Selected title: ${candidate.title || candidate.title_id}`, "secondary");
+    showSelectedTitle(candidate);
+    setStatus("Title selected. Enter search text below and run the search.", "success");
+
+    selectedTitleHeading.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+    });
   });
 
   return button;
@@ -284,6 +292,22 @@ function renderTitleCandidates(candidates) {
   for (const candidate of candidates) {
     titleLookupResultsEl.appendChild(createTitleCandidateButton(candidate));
   }
+}
+
+function showSelectedTitle(candidate) {
+  selectedTitleSummary.replaceChildren();
+  selectedTitleSummary.className = "alert alert-success";
+
+  const title = document.createElement("div");
+  title.className = "fw-semibold";
+  title.textContent = candidate.title || `BHL title ${candidate.title_id}`;
+
+  const meta = document.createElement("div");
+  meta.className = "small";
+  meta.textContent = `Selected title ID: ${candidate.title_id}`;
+
+  selectedTitleSummary.appendChild(title);
+  selectedTitleSummary.appendChild(meta);
 }
 
 titleLookupForm.addEventListener("submit", async (event) => {
