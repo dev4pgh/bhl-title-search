@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BHL Title Search</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-body-tertiary">
+    <main class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-9 col-xl-8">
+                <div class="mb-4">
+                    <h1 class="display-5 fw-semibold">BHL Title Search</h1>
+                    <p class="lead">
+                        Search across all volumes/items in a Biodiversity Heritage Library title.
+                    </p>
+                </div>
+
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <form id="search-form">
+                            <div class="mb-3">
+                                <label for="title-id" class="form-label">BHL title ID</label>
+                                <input id="title-id" name="title_id" type="number" class="form-control"
+                                    value="{{ example_title_id }}" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="text" class="form-label">Search text</label>
+                                <input id="text" name="text" type="search" class="form-control"
+                                    value="{{ example_text }}" required>
+                            </div>
+
+                            <button id="search-button" type="submit" class="btn btn-primary">
+                                Search
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div id="status" class="alert alert-secondary" role="status">
+                    Submit a search to see results.
+                </div>
+
+                <div class="card shadow-sm">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h2 class="h5 mb-0">Raw response</h2>
+                        <a href="/docs" class="small">API docs</a>
+                    </div>
+                    <div class="card-body">
+                        <pre id="results" class="mb-0 small text-wrap">No response yet.</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        const form = document.querySelector("#search-form");
+        const statusEl = document.querySelector("#status");
+        const resultsEl = document.querySelector("#results");
+        const searchButton = document.querySelector("#search-button");
+
+        function setStatus(message, type) {
+            statusEl.textContent = message;
+            statusEl.className = `alert alert-${type}`;
+        }
+
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            const formData = new FormData(form);
+            const params = new URLSearchParams(formData);
+
+            searchButton.disabled = true;
+            setStatus("Searching BHL...", "info");
+            resultsEl.textContent = "";
+
+            try {
+                const response = await fetch(`/api/bhl-title-search?${params}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    setStatus("Search failed.", "danger");
+                } else {
+                    setStatus(
+                        `Found ${data.total_matches} page match(es) across ${data.matching_item_count} item(s).`,
+                        "success"
+                    );
+                }
+
+                resultsEl.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                setStatus("Search failed.", "danger");
+                resultsEl.textContent = String(error);
+            } finally {
+                searchButton.disabled = false;
+            }
+        });
+    </script>
+</body>
+
+</html>

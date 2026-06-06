@@ -5,10 +5,11 @@ from email.utils import parsedate_to_datetime
 from typing import Any
 
 import httpx
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.templating import Jinja2Templates
 
 app = FastAPI(title="BHL Title Search")
+templates = Jinja2Templates(directory="app/templates")
 
 BHL_API_URL = "https://www.biodiversitylibrary.org/api3"
 
@@ -203,62 +204,16 @@ def format_item_summary(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-@app.get("/", response_class=HTMLResponse)
-def home() -> str:
-    return """
-    <!doctype html>
-    <html lang="en">
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>BHL Title Search</title>
-        <style>
-          body {
-            max-width: 760px;
-            margin: 3rem auto;
-            padding: 0 1rem;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            line-height: 1.5;
-          }
-
-          code {
-            background: #f3f3f3;
-            padding: 0.15rem 0.3rem;
-            border-radius: 0.25rem;
-          }
-
-          a {
-            color: inherit;
-          }
-        </style>
-      </head>
-      <body>
-        <h1>BHL Title Search</h1>
-
-        <p>
-          This lightweight app will search across all volumes/items in a
-          Biodiversity Heritage Library title.
-        </p>
-
-        <p>
-          The backend API is running. The search interface will come next.
-        </p>
-
-        <h2>Current test links</h2>
-
-        <ul>
-          <li><a href="/api/ping">API ping</a></li>
-          <li><a href="/api/bhl-title?title_id=61122">Example title metadata</a></li>
-          <li><a href="/docs">Interactive API docs</a></li>
-        </ul>
-
-        <p>
-          Current search endpoint:
-          <code>/api/bhl-title-search?title_id=61122&amp;text=cat</code>
-        </p>
-      </body>
-    </html>
-    """
+@app.get("/")
+def home(request: Request):
+    return templates.TemplateResponse(
+        request,
+        "index.html",
+        {
+            "example_title_id": 61122,
+            "example_text": "cat",
+        },
+    )
 
 
 @app.get("/healthz")
