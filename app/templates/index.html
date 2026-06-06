@@ -26,13 +26,22 @@
                             <label for="title-query" class="form-label">Find a BHL title</label>
                             <div class="input-group">
                                 <input id="title-query" name="title" type="search" class="form-control"
-                                    placeholder="e.g. Proceedings California Academy" autocomplete="off">
+                                    aria-describedby="title-query-help" autocomplete="off" required>
                                 <button id="title-lookup-button" type="submit" class="btn btn-outline-primary">
                                     Find title
                                 </button>
                             </div>
-                            <div class="form-text">
-                                Search by publication title, then choose a result below.
+                            <div id="title-query-help" class="form-text">
+                                Try a publication title such as
+                                <button type="button" class="btn btn-link btn-sm p-0 example-title"
+                                    data-title="Proceedings of the California Academy of Sciences">
+                                    Proceedings of the California Academy of Sciences
+                                </button>
+                                or
+                                <button type="button" class="btn btn-link btn-sm p-0 example-title"
+                                    data-title="Annals and Magazine of Natural History">
+                                    Annals and Magazine of Natural History
+                                </button>.
                             </div>
                         </form>
 
@@ -57,13 +66,32 @@
                             <div class="mb-3">
                                 <label for="title-id" class="form-label">Selected BHL title ID</label>
                                 <input id="title-id" name="title_id" type="number" class="form-control"
-                                    value="{{ example_title_id }}" required>
+                                    value="{{ example_title_id }}" aria-describedby="title-id-help" required>
+                                <div id="title-id-help" class="form-text">
+                                    Choose a title above, or paste a BHL bibliography/title ID directly.
+                                </div>
                             </div>
 
                             <div class="mb-3">
                                 <label for="text" class="form-label">Search text</label>
+                                <label for="text" class="form-label">Search text</label>
                                 <input id="text" name="text" type="search" class="form-control"
-                                    value="{{ example_text }}" required>
+                                    value="{{ example_text }}" aria-describedby="search-text-help" required>
+                                <div id="search-text-help" class="form-text">
+                                    Enter the word or phrase to find across the selected title’s volumes, such as
+                                    <button type="button" class="btn btn-link btn-sm p-0 example-search-text"
+                                        data-text="orchid">
+                                        orchid
+                                    </button>,
+                                    <button type="button" class="btn btn-link btn-sm p-0 example-search-text"
+                                        data-text="domestic cat">
+                                        domestic cat
+                                    </button>, or
+                                    <button type="button" class="btn btn-link btn-sm p-0 example-search-text"
+                                        data-text="new species">
+                                        new species
+                                    </button>.
+                                </div>
                             </div>
 
                             <button id="search-button" type="submit" class="btn btn-primary">

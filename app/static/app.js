@@ -12,6 +12,8 @@ const selectedTitleHeading = document.querySelector("#selected-title-heading");
 const selectedTitleSummary = document.querySelector("#selected-title-summary");
 const titleLookupCollapseEl = document.querySelector("#title-lookup-collapse");
 const changeTitleButton = document.querySelector("#change-title-button");
+const titleQueryInput = document.querySelector("#title-query");
+const searchTextInput = document.querySelector("#text");
 
 function setStatus(message, type) {
   statusEl.textContent = message;
@@ -368,6 +370,20 @@ titleLookupForm.addEventListener("submit", async (event) => {
   } finally {
     titleLookupButton.disabled = false;
   }
+});
+
+document.querySelectorAll(".example-title").forEach((button) => {
+  button.addEventListener("click", () => {
+    titleQueryInput.value = button.dataset.title;
+    titleQueryInput.focus();
+  });
+});
+
+document.querySelectorAll(".example-search-text").forEach((button) => {
+  button.addEventListener("click", () => {
+    searchTextInput.value = button.dataset.text;
+    searchTextInput.focus();
+  });
 });
 
 form.addEventListener("submit", async (event) => {

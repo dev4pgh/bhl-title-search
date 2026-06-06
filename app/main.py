@@ -273,8 +273,8 @@ def home(request: Request):
         request,
         "index.html",
         {
-            "example_title_id": 61122,
-            "example_text": "cat",
+            "example_title_id": "",
+            "example_text": "",
         },
     )
 
