@@ -239,6 +239,34 @@ def format_item_summary(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def format_author_names(publication: dict[str, Any]) -> list[str]:
+    authors = publication.get("Authors") or []
+
+    names = []
+
+    for author in authors:
+        name = author.get("Name")
+
+        if name:
+            names.append(name)
+
+    return names
+
+
+def format_title_candidate(publication: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "title_id": publication.get("TitleID"),
+        "title": publication.get("Title"),
+        "title_url": publication.get("TitleUrl"),
+        "genre": publication.get("Genre"),
+        "date": publication.get("Date"),
+        "authors": format_author_names(publication),
+        "item_id": publication.get("ItemID"),
+        "item_url": publication.get("ItemUrl"),
+        "volume": publication.get("Volume"),
+    }
+
+
 @app.get("/")
 def home(request: Request):
     return templates.TemplateResponse(
@@ -278,6 +306,48 @@ async def bhl_title(
         "title": format_title(title),
         "item_count": len(items),
         "items": [format_item_summary(item) for item in items],
+    }
+
+
+@app.get("/api/bhl-title-lookup")
+async def bhl_title_lookup(
+    title: str = Query(
+        ..., min_length=2, description="Publication title to search for"
+    ),
+):
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        data = await bhl_get(
+            client,
+            {
+                "op": "PublicationSearchAdvanced",
+                "title": title,
+                "titleop": "all",
+                "page": 1,
+                "pageSize": 20,
+            },
+            error_message="BHL API returned an error while searching titles.",
+        )
+
+    publications = data.get("Result") or []
+
+    candidates_by_title_id = {}
+    for publication in publications:
+        title_id = publication.get("TitleID")
+
+        if not title_id:
+            continue
+
+        if title_id not in candidates_by_title_id:
+            candidates_by_title_id[title_id] = format_title_candidate(publication)
+
+    return {
+        "ok": True,
+        "source": "bhl",
+        "query": {
+            "title": title,
+        },
+        "candidate_count": len(candidates_by_title_id),
+        "candidates": list(candidates_by_title_id.values()),
     }
 
 
