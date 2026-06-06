@@ -389,6 +389,15 @@ document.querySelectorAll(".example-search-text").forEach((button) => {
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
+  if (!titleIdInput.value) {
+    setStatus("Choose a BHL title first, or enter a title ID under Advanced.", "warning");
+    selectedTitleHeading.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+    return;
+  }
+
   const formData = new FormData(form);
   const params = new URLSearchParams(formData);
 

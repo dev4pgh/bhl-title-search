@@ -51,10 +51,10 @@
 
                         <hr class="my-4">
 
-                        <h2 id="selected-title-heading" class="h5">Search within selected title</h2>
+                        <h2 id="selected-title-heading" class="h5">Search within a publication</h2>
 
-                        <div id="selected-title-summary" class="alert alert-secondary d-none" role="status">
-                            No title selected yet.
+                        <div id="selected-title-summary" class="alert alert-secondary" role="status">
+                            Choose a BHL title above to begin, or use advanced options to enter a title ID directly.
                         </div>
 
                         <button id="change-title-button" type="button"
@@ -62,42 +62,44 @@
                             Change title
                         </button>
 
-                        <form id="search-form">
-                            <div class="mb-3">
-                                <label for="title-id" class="form-label">Selected BHL title ID</label>
-                                <input id="title-id" name="title_id" type="number" class="form-control"
-                                    value="{{ example_title_id }}" aria-describedby="title-id-help" required>
-                                <div id="title-id-help" class="form-text">
-                                    Choose a title above, or paste a BHL bibliography/title ID directly.
+                        <div class="accordion mb-3" id="advanced-title-id-accordion">
+                            <div class="accordion-item">
+                                <h3 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                        data-bs-target="#advanced-title-id" aria-expanded="false"
+                                        aria-controls="advanced-title-id">
+                                        Advanced: enter a BHL title ID directly
+                                    </button>
+                                </h3>
+                                <div id="advanced-title-id" class="accordion-collapse collapse"
+                                    data-bs-parent="#advanced-title-id-accordion">
+                                    <div class="accordion-body">
+                                        <label for="title-id" class="form-label">BHL title ID</label>
+                                        <input id="title-id" name="title_id" form="search-form" type="number"
+                                            class="form-control" value="{{ example_title_id }}"
+                                            aria-describedby="title-id-help" required>
+                                        <div id="title-id-help" class="form-text">
+                                            Use this if you already know the BHL bibliography/title ID.
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
+                        </div>
 
+                        <form id="search-form">
                             <div class="mb-3">
-                                <label for="text" class="form-label">Search text</label>
                                 <label for="text" class="form-label">Search text</label>
                                 <input id="text" name="text" type="search" class="form-control"
                                     value="{{ example_text }}" aria-describedby="search-text-help" required>
                                 <div id="search-text-help" class="form-text">
-                                    Enter the word or phrase to find across the selected title’s volumes, such as
-                                    <button type="button" class="btn btn-link btn-sm p-0 example-search-text"
-                                        data-text="orchid">
-                                        orchid
-                                    </button>,
-                                    <button type="button" class="btn btn-link btn-sm p-0 example-search-text"
-                                        data-text="domestic cat">
-                                        domestic cat
-                                    </button>, or
-                                    <button type="button" class="btn btn-link btn-sm p-0 example-search-text"
-                                        data-text="new species">
-                                        new species
-                                    </button>.
+                                    Enter a word or phrase to search across the selected publication’s volumes.
                                 </div>
                             </div>
 
                             <button id="search-button" type="submit" class="btn btn-primary">
                                 <span id="search-spinner" class="spinner-border spinner-border-sm me-2 d-none"
                                     aria-hidden="true"></span>
-                                <span id="search-button-text">Search</span>
+                                <span id="search-button-text">Search selected publication</span>
                             </button>
                         </form>
                     </div>
