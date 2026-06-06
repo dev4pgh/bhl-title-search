@@ -12,6 +12,18 @@ app = FastAPI(title="BHL Title Search")
 BHL_API_URL = "https://www.biodiversitylibrary.org/api3"
 
 
+def get_bhl_api_key() -> str:
+    api_key = os.getenv("BHL_API_KEY", "").strip()
+
+    if not api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="BHL_API_KEY is not configured.",
+        )
+
+    return api_key
+
+
 def retry_after_seconds(value: str | None) -> float | None:
     if not value:
         return None
@@ -31,18 +43,6 @@ def retry_after_seconds(value: str | None) -> float | None:
         return max((retry_at - now).total_seconds(), 0.0)
     except (TypeError, ValueError):
         return None
-
-
-def get_bhl_api_key() -> str:
-    api_key = os.getenv("BHL_API_KEY", "").strip()
-
-    if not api_key:
-        raise HTTPException(
-            status_code=500,
-            detail="BHL_API_KEY is not configured.",
-        )
-
-    return api_key
 
 
 async def bhl_get(
@@ -109,10 +109,6 @@ async def bhl_get(
     )
 
 
-async def polite_bhl_pause() -> None:
-    await asyncio.sleep(0.25)
-
-
 async def get_title_with_items(
     client: httpx.AsyncClient,
     title_id: int,
@@ -160,12 +156,58 @@ async def search_item_pages(
     return data.get("Result") or []
 
 
+async def polite_bhl_pause() -> None:
+    await asyncio.sleep(0.25)
+
+
+def get_page_number(page: dict[str, Any]) -> str | None:
+    page_numbers = page.get("PageNumbers") or []
+
+    if not page_numbers:
+        return None
+
+    first_page_number = page_numbers[0]
+
+    if not isinstance(first_page_number, dict):
+        return None
+
+    return first_page_number.get("Number")
+
+
+def format_page_result(page: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "page_id": page.get("PageID"),
+        "page_number": get_page_number(page),
+        "page_url": page.get("PageUrl"),
+        "thumbnail_url": page.get("ThumbnailUrl"),
+        "text_source": page.get("TextSource"),
+    }
+
+
+def format_title(title: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "title_id": title.get("TitleID"),
+        "full_title": title.get("FullTitle"),
+        "short_title": title.get("ShortTitle"),
+        "title_url": title.get("TitleUrl"),
+    }
+
+
+def format_item_summary(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "item_id": item.get("ItemID"),
+        "volume": item.get("Volume"),
+        "year": item.get("Year"),
+        "item_url": item.get("ItemUrl"),
+    }
+
+
 @app.get("/")
 def home():
     return {
         "app": "BHL Title Search",
         "status": "running",
-        "message": "FastAPI is working.",
+        "message": "Traefik routing is working.",
     }
 
 
@@ -176,7 +218,11 @@ def healthz():
 
 @app.get("/api/ping")
 def api_ping():
-    return {"ok": True, "app": "BHL Title Search", "api": "reachable"}
+    return {
+        "ok": True,
+        "app": "BHL Title Search",
+        "api": "reachable",
+    }
 
 
 @app.get("/api/bhl-title")
@@ -189,77 +235,9 @@ async def bhl_title(
     return {
         "ok": True,
         "source": "bhl",
-        "title": {
-            "title_id": title.get("TitleID"),
-            "full_title": title.get("FullTitle"),
-            "short_title": title.get("ShortTitle"),
-            "title_url": title.get("TitleUrl"),
-        },
+        "title": format_title(title),
         "item_count": len(items),
-        "first_items": items[:5],
-    }
-
-
-@app.get("/api/bhl-page-search")
-async def bhl_page_search(
-    item_id: int = Query(..., description="BHL item/volume ID"),
-    text: str = Query(..., min_length=1, description="Text to search for"),
-):
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        pages = await search_item_pages(client, item_id, text)
-
-    return {
-        "ok": True,
-        "source": "bhl",
-        "query": {
-            "item_id": item_id,
-            "text": text,
-        },
-        "match_count": len(pages),
-        "first_pages": pages[:5],
-    }
-
-
-@app.get("/api/bhl-title-first-item-search")
-async def bhl_title_first_item_search(
-    title_id: int = Query(..., description="BHL title/publication ID"),
-    text: str = Query(..., min_length=1, description="Text to search for"),
-):
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        title, items = await get_title_with_items(client, title_id)
-
-        if not items:
-            raise HTTPException(
-                status_code=404,
-                detail="That BHL title has no associated items.",
-            )
-
-        first_item = items[0]
-        item_id = first_item.get("ItemID")
-        pages = await search_item_pages(client, item_id, text)
-
-    return {
-        "ok": True,
-        "source": "bhl",
-        "mode": "first_item_only",
-        "query": {
-            "title_id": title_id,
-            "text": text,
-        },
-        "title": {
-            "title_id": title.get("TitleID"),
-            "full_title": title.get("FullTitle"),
-            "title_url": title.get("TitleUrl"),
-        },
-        "searched_item": {
-            "item_id": item_id,
-            "volume": first_item.get("Volume"),
-            "year": first_item.get("Year"),
-            "item_url": first_item.get("ItemUrl"),
-        },
-        "available_item_count": len(items),
-        "match_count": len(pages),
-        "first_pages": pages[:5],
+        "items": [format_item_summary(item) for item in items],
     }
 
 
@@ -295,12 +273,9 @@ async def bhl_title_search(
 
             matching_items.append(
                 {
-                    "item_id": item_id,
-                    "volume": item.get("Volume"),
-                    "year": item.get("Year"),
-                    "item_url": item.get("ItemUrl"),
+                    **format_item_summary(item),
                     "match_count": len(pages),
-                    "first_pages": pages[:5],
+                    "pages": [format_page_result(page) for page in pages],
                 }
             )
 
@@ -312,11 +287,7 @@ async def bhl_title_search(
             "title_id": title_id,
             "text": text,
         },
-        "title": {
-            "title_id": title.get("TitleID"),
-            "full_title": title.get("FullTitle"),
-            "title_url": title.get("TitleUrl"),
-        },
+        "title": format_title(title),
         "available_item_count": len(items),
         "searched_item_count": len(items),
         "matching_item_count": len(matching_items),
