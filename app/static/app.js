@@ -36,23 +36,40 @@ function createPageList(pages) {
     const item = document.createElement("li");
     item.className = "list-group-item px-0";
 
+    const row = document.createElement("div");
+    row.className = "d-flex flex-column flex-sm-row gap-2 align-items-sm-center justify-content-between";
+
     const pageLabel = page.page_number
       ? `Page ${page.page_number}`
       : `Page ID ${page.page_id}`;
 
+    const label = document.createElement("span");
+    label.textContent = pageLabel;
+    row.appendChild(label);
+
+    const links = document.createElement("div");
+    links.className = "d-flex flex-wrap gap-2";
+
     if (page.page_url) {
-      item.appendChild(createExternalLink(page.page_url, pageLabel));
-    } else {
-      item.textContent = pageLabel;
+      const pageLink = createExternalLink(page.page_url, "Open page");
+      pageLink.className = "btn btn-sm btn-primary";
+      links.appendChild(pageLink);
     }
 
-    if (page.text_source) {
-      const badge = document.createElement("span");
-      badge.className = "badge text-bg-secondary ms-2";
-      badge.textContent = page.text_source;
-      item.appendChild(badge);
+    if (page.text_url) {
+      const textLink = createExternalLink(page.text_url, "View text");
+      textLink.className = "btn btn-sm btn-outline-secondary";
+      links.appendChild(textLink);
     }
 
+    if (page.image_url) {
+      const imageLink = createExternalLink(page.image_url, "View image");
+      imageLink.className = "btn btn-sm btn-outline-secondary";
+      links.appendChild(imageLink);
+    }
+
+    row.appendChild(links);
+    item.appendChild(row);
     list.appendChild(item);
   }
 

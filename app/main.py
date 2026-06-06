@@ -179,12 +179,19 @@ def get_page_number(page: dict[str, Any]) -> str | None:
 
 
 def format_page_result(page: dict[str, Any]) -> dict[str, Any]:
+    page_id = page.get("PageID")
+
     return {
-        "page_id": page.get("PageID"),
+        "page_id": page_id,
         "page_number": get_page_number(page),
-        "page_url": page.get("PageUrl"),
+        "page_url": (
+            f"https://www.biodiversitylibrary.org/page/{page_id}"
+            if page_id
+            else page.get("PageUrl")
+        ),
+        "text_url": page.get("OcrUrl"),
         "thumbnail_url": page.get("ThumbnailUrl"),
-        "text_source": page.get("TextSource"),
+        "image_url": page.get("FullSizeImageUrl"),
     }
 
 
