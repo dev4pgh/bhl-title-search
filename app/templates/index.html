@@ -22,9 +22,29 @@
 
                 <div class="card shadow-sm mb-4">
                     <div class="card-body">
+                        <form id="title-lookup-form" class="mb-4">
+                            <label for="title-query" class="form-label">Find a BHL title</label>
+                            <div class="input-group">
+                                <input id="title-query" name="title" type="search" class="form-control"
+                                    placeholder="e.g. Proceedings California Academy" autocomplete="off">
+                                <button id="title-lookup-button" type="submit" class="btn btn-outline-primary">
+                                    Find title
+                                </button>
+                            </div>
+                            <div class="form-text">
+                                Search by publication title, then choose a result below.
+                            </div>
+                        </form>
+
+                        <div id="title-lookup-results" class="list-group mb-4 d-none"></div>
+
+                        <hr class="my-4">
+
+                        <h2 class="h5">Search within selected title</h2>
+
                         <form id="search-form">
                             <div class="mb-3">
-                                <label for="title-id" class="form-label">BHL title ID</label>
+                                <label for="title-id" class="form-label">Selected BHL title ID</label>
                                 <input id="title-id" name="title_id" type="number" class="form-control"
                                     value="{{ example_title_id }}" required>
                             </div>

@@ -4,6 +4,10 @@ const resultsEl = document.querySelector("#results");
 const searchButton = document.querySelector("#search-button");
 const searchSpinner = document.querySelector("#search-spinner");
 const searchButtonText = document.querySelector("#search-button-text");
+const titleLookupForm = document.querySelector("#title-lookup-form");
+const titleLookupResultsEl = document.querySelector("#title-lookup-results");
+const titleLookupButton = document.querySelector("#title-lookup-button");
+const titleIdInput = document.querySelector("#title-id");
 
 function setStatus(message, type) {
   statusEl.textContent = message;
@@ -205,6 +209,112 @@ function renderResults(data) {
     resultsEl.appendChild(createItemCard(item));
   }
 }
+
+function clearTitleLookupResults() {
+  titleLookupResultsEl.replaceChildren();
+  titleLookupResultsEl.classList.add("d-none");
+}
+
+function formatCandidateSubtitle(candidate) {
+  const parts = [];
+
+  if (candidate.authors && candidate.authors.length > 0) {
+    parts.push(candidate.authors.join(", "));
+  }
+
+  if (candidate.date) {
+    parts.push(candidate.date);
+  }
+
+  if (candidate.genre) {
+    parts.push(candidate.genre);
+  }
+
+  return parts.join(" · ");
+}
+
+function createTitleCandidateButton(candidate) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "list-group-item list-group-item-action";
+
+  const title = document.createElement("div");
+  title.className = "fw-semibold";
+  title.textContent = candidate.title || `BHL title ${candidate.title_id}`;
+
+  const subtitle = document.createElement("div");
+  subtitle.className = "small text-body-secondary";
+  subtitle.textContent = formatCandidateSubtitle(candidate);
+
+  const meta = document.createElement("div");
+  meta.className = "small text-body-secondary";
+  meta.textContent = `Title ID: ${candidate.title_id}`;
+
+  button.appendChild(title);
+
+  if (subtitle.textContent) {
+    button.appendChild(subtitle);
+  }
+
+  button.appendChild(meta);
+
+  button.addEventListener("click", () => {
+    titleIdInput.value = candidate.title_id;
+    setStatus(`Selected title: ${candidate.title || candidate.title_id}`, "secondary");
+  });
+
+  return button;
+}
+
+function renderTitleCandidates(candidates) {
+  clearTitleLookupResults();
+
+  if (!candidates || candidates.length === 0) {
+    titleLookupResultsEl.classList.remove("d-none");
+
+    const empty = document.createElement("div");
+    empty.className = "list-group-item text-body-secondary";
+    empty.textContent = "No matching BHL titles found.";
+    titleLookupResultsEl.appendChild(empty);
+    return;
+  }
+
+  titleLookupResultsEl.classList.remove("d-none");
+
+  for (const candidate of candidates) {
+    titleLookupResultsEl.appendChild(createTitleCandidateButton(candidate));
+  }
+}
+
+titleLookupForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const formData = new FormData(titleLookupForm);
+  const params = new URLSearchParams(formData);
+
+  titleLookupButton.disabled = true;
+  setStatus("Searching BHL titles...", "info");
+  clearTitleLookupResults();
+
+  try {
+    const response = await fetch(`/api/bhl-title-lookup?${params}`);
+    const data = await response.json();
+
+    if (!response.ok) {
+      setStatus("Title lookup failed.", "danger");
+      renderTitleCandidates([]);
+      return;
+    }
+
+    setStatus(`Found ${data.candidate_count} candidate title(s).`, "success");
+    renderTitleCandidates(data.candidates);
+  } catch (error) {
+    setStatus("Title lookup failed.", "danger");
+    renderTitleCandidates([]);
+  } finally {
+    titleLookupButton.disabled = false;
+  }
+});
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
