@@ -36,7 +36,9 @@
                             </div>
                         </form>
 
-                        <div id="title-lookup-results" class="list-group mb-4 d-none"></div>
+                        <div id="title-lookup-collapse" class="collapse">
+                            <div id="title-lookup-results" class="list-group mb-4"></div>
+                        </div>
 
                         <hr class="my-4">
 
@@ -45,6 +47,11 @@
                         <div id="selected-title-summary" class="alert alert-secondary d-none" role="status">
                             No title selected yet.
                         </div>
+
+                        <button id="change-title-button" type="button"
+                            class="btn btn-sm btn-outline-secondary d-none mb-3">
+                            Change title
+                        </button>
 
                         <form id="search-form">
                             <div class="mb-3">

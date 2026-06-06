@@ -10,6 +10,8 @@ const titleLookupButton = document.querySelector("#title-lookup-button");
 const titleIdInput = document.querySelector("#title-id");
 const selectedTitleHeading = document.querySelector("#selected-title-heading");
 const selectedTitleSummary = document.querySelector("#selected-title-summary");
+const titleLookupCollapseEl = document.querySelector("#title-lookup-collapse");
+const changeTitleButton = document.querySelector("#change-title-button");
 
 function setStatus(message, type) {
   statusEl.textContent = message;
@@ -212,9 +214,26 @@ function renderResults(data) {
   }
 }
 
-function clearTitleLookupResults() {
+function getTitleLookupCollapse() {
+  return bootstrap.Collapse.getOrCreateInstance(titleLookupCollapseEl, {
+    toggle: false
+  });
+}
+
+function showTitleLookupResults() {
+  getTitleLookupCollapse().show();
+}
+
+function hideTitleLookupResults() {
+  getTitleLookupCollapse().hide();
+}
+
+function clearTitleLookupResults({ hide = false } = {}) {
   titleLookupResultsEl.replaceChildren();
-  titleLookupResultsEl.classList.add("d-none");
+
+  if (hide) {
+    hideTitleLookupResults();
+  }
 }
 
 function formatCandidateSubtitle(candidate) {
@@ -263,13 +282,22 @@ function createTitleCandidateButton(candidate) {
   button.addEventListener("click", () => {
     titleIdInput.value = candidate.title_id;
     showSelectedTitle(candidate);
+
     setStatus("Title selected. Enter search text below and run the search.", "success");
 
-    selectedTitleHeading.scrollIntoView({
-        behavior: "smooth",
-        block: "start"
-    });
-  });
+    titleLookupCollapseEl.addEventListener(
+        "hidden.bs.collapse",
+        () => {
+        selectedTitleHeading.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+        });
+        },
+        { once: true }
+    );
+
+    hideTitleLookupResults();
+ });
 
   return button;
 }
@@ -278,7 +306,7 @@ function renderTitleCandidates(candidates) {
   clearTitleLookupResults();
 
   if (!candidates || candidates.length === 0) {
-    titleLookupResultsEl.classList.remove("d-none");
+    showTitleLookupResults();
 
     const empty = document.createElement("div");
     empty.className = "list-group-item text-body-secondary";
@@ -287,7 +315,7 @@ function renderTitleCandidates(candidates) {
     return;
   }
 
-  titleLookupResultsEl.classList.remove("d-none");
+  showTitleLookupResults();
 
   for (const candidate of candidates) {
     titleLookupResultsEl.appendChild(createTitleCandidateButton(candidate));
@@ -308,6 +336,8 @@ function showSelectedTitle(candidate) {
 
   selectedTitleSummary.appendChild(title);
   selectedTitleSummary.appendChild(meta);
+
+  changeTitleButton.classList.remove("d-none");
 }
 
 titleLookupForm.addEventListener("submit", async (event) => {
@@ -375,4 +405,13 @@ form.addEventListener("submit", async (event) => {
   } finally {
     setLoading(false);
   }
+});
+
+changeTitleButton.addEventListener("click", () => {
+  showTitleLookupResults();
+
+  titleLookupForm.scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
 });
