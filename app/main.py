@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any
@@ -178,7 +179,30 @@ def get_page_number(page: dict[str, Any]) -> str | None:
     return first_page_number.get("Number")
 
 
-def format_page_result(page: dict[str, Any]) -> dict[str, Any]:
+def make_snippet(text: str | None, search_text: str, radius: int = 160) -> str | None:
+    if not text:
+        return None
+
+    normalized_text = " ".join(text.split())
+
+    if not normalized_text:
+        return None
+
+    match = re.search(re.escape(search_text), normalized_text, flags=re.IGNORECASE)
+
+    if not match:
+        return normalized_text[: radius * 2]
+
+    start = max(match.start() - radius, 0)
+    end = min(match.end() + radius, len(normalized_text))
+
+    prefix = "…" if start > 0 else ""
+    suffix = "…" if end < len(normalized_text) else ""
+
+    return f"{prefix}{normalized_text[start:end]}{suffix}"
+
+
+def format_page_result(page: dict[str, Any], search_text: str) -> dict[str, Any]:
     page_id = page.get("PageID")
 
     return {
@@ -192,6 +216,7 @@ def format_page_result(page: dict[str, Any]) -> dict[str, Any]:
         "text_url": page.get("OcrUrl"),
         "thumbnail_url": page.get("ThumbnailUrl"),
         "image_url": page.get("FullSizeImageUrl"),
+        "snippet": make_snippet(page.get("OcrText"), search_text),
     }
 
 
@@ -289,7 +314,7 @@ async def bhl_title_search(
                 {
                     **format_item_summary(item),
                     "match_count": len(pages),
-                    "pages": [format_page_result(page) for page in pages],
+                    "pages": [format_page_result(page, text) for page in pages],
                 }
             )
 

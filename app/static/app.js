@@ -79,6 +79,12 @@ function createPageList(pages) {
     row.appendChild(links);
     item.appendChild(row);
     list.appendChild(item);
+    if (page.snippet) {
+        const snippet = document.createElement("p");
+        snippet.className = "mt-2 mb-0 small text-body-secondary";
+        snippet.textContent = page.snippet;
+        item.appendChild(snippet);
+    }
   }
 
   return list;
