@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import re
 from datetime import datetime, timezone
@@ -7,6 +8,7 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -267,6 +269,10 @@ def format_title_candidate(publication: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def sse_event(event: str, data: dict[str, Any]) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
 @app.get("/")
 def home(request: Request):
     return templates.TemplateResponse(
@@ -404,3 +410,118 @@ async def bhl_title_search(
         "total_matches": sum(item["match_count"] for item in matching_items),
         "matching_items": matching_items,
     }
+
+
+@app.get("/api/bhl-title-search-stream")
+async def bhl_title_search_stream(
+    title_id: int = Query(..., description="BHL title/publication ID"),
+    text: str = Query(..., min_length=1, description="Text to search for"),
+):
+    async def stream_search():
+        searched_item_count = 0
+        matching_item_count = 0
+        total_matches = 0
+
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                title, items = await get_title_with_items(client, title_id)
+
+                if not items:
+                    yield sse_event(
+                        "error",
+                        {
+                            "message": "That BHL title has no associated items.",
+                        },
+                    )
+                    return
+
+                yield sse_event(
+                    "start",
+                    {
+                        "ok": True,
+                        "source": "bhl",
+                        "mode": "all_items_streaming",
+                        "query": {
+                            "title_id": title_id,
+                            "text": text,
+                        },
+                        "title": format_title(title),
+                        "available_item_count": len(items),
+                    },
+                )
+
+                for index, item in enumerate(items):
+                    item_id = item.get("ItemID")
+
+                    if not item_id:
+                        continue
+
+                    if index > 0:
+                        await polite_bhl_pause()
+
+                    pages = await search_item_pages(client, item_id, text)
+                    searched_item_count += 1
+
+                    if pages:
+                        formatted_item = {
+                            **format_item_summary(item),
+                            "match_count": len(pages),
+                            "pages": [format_page_result(page, text) for page in pages],
+                        }
+
+                        matching_item_count += 1
+                        total_matches += len(pages)
+
+                        yield sse_event(
+                            "item",
+                            {
+                                "item": formatted_item,
+                                "searched_item_count": searched_item_count,
+                                "available_item_count": len(items),
+                                "matching_item_count": matching_item_count,
+                                "total_matches": total_matches,
+                            },
+                        )
+
+                    yield sse_event(
+                        "progress",
+                        {
+                            "searched_item_count": searched_item_count,
+                            "available_item_count": len(items),
+                            "matching_item_count": matching_item_count,
+                            "total_matches": total_matches,
+                        },
+                    )
+
+                yield sse_event(
+                    "done",
+                    {
+                        "ok": True,
+                        "searched_item_count": searched_item_count,
+                        "available_item_count": len(items),
+                        "matching_item_count": matching_item_count,
+                        "total_matches": total_matches,
+                    },
+                )
+
+        except HTTPException as exc:
+            yield sse_event(
+                "error",
+                {
+                    "message": "Search failed.",
+                    "detail": exc.detail,
+                },
+            )
+
+        except Exception:
+            yield sse_event(
+                "error",
+                {
+                    "message": "Search failed unexpectedly.",
+                },
+            )
+
+    return StreamingResponse(
+        stream_search(),
+        media_type="text/event-stream",
+    )
