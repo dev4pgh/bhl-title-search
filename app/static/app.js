@@ -45,6 +45,22 @@ function appendEmptyMessage(message) {
   resultsEl.appendChild(paragraph);
 }
 
+function appendResultsPlaceholder(message) {
+  const paragraph = document.createElement("p");
+  paragraph.id = "results-placeholder";
+  paragraph.className = "text-body-secondary mb-0";
+  paragraph.textContent = message;
+  resultsEl.appendChild(paragraph);
+}
+
+function removeResultsPlaceholder() {
+  const placeholder = document.querySelector("#results-placeholder");
+
+  if (placeholder) {
+    placeholder.remove();
+  }
+}
+
 function createExternalLink(url, text) {
   const link = document.createElement("a");
   link.href = url;
@@ -434,11 +450,13 @@ document.querySelectorAll(".example-search-text").forEach((button) => {
   });
 });
 
-form.addEventListener("submit", async (event) => {
+let activeSearchSource = null;
+
+form.addEventListener("submit", (event) => {
   event.preventDefault();
 
   if (!titleIdInput.value) {
-    setStatus("Choose a BHL title first, or enter a title ID under Advanced.", "warning");
+    setStatus("Choose a BHL publication first, or enter a title number manually.", "warning");
     selectedTitleHeading.scrollIntoView({
       behavior: "smooth",
       block: "start"
@@ -446,44 +464,148 @@ form.addEventListener("submit", async (event) => {
     return;
   }
 
+  if (activeSearchSource) {
+    activeSearchSource.close();
+    activeSearchSource = null;
+  }
+
   const formData = new FormData(form);
   const params = new URLSearchParams(formData);
 
   setLoading(true);
-  setStatus("Searching BHL...", "info");
   clearResults();
-  appendEmptyMessage("Searching. Large titles may take a while.");
+  setStatus("Starting search...", "info");
 
-  try {
-    const response = await fetch(`/api/bhl-title-search?${params}`);
-    const data = await response.json();
+  activeSearchSource = new EventSource(`/api/bhl-title-search-stream?${params}`);
 
-    if (!response.ok) {
-      setStatus("Search failed.", "danger");
+  let titleData = null;
+  let searchedItemCount = 0;
+  let availableItemCount = 0;
+  let matchingItemCount = 0;
+  let totalMatches = 0;
+
+  activeSearchSource.addEventListener("start", (event) => {
+    const data = JSON.parse(event.data);
+
+    titleData = data.title;
+    availableItemCount = data.available_item_count;
+
+    clearResults();
+    appendResultsPlaceholder(`Searching ${availableItemCount} volume/item(s)...`);
+
+    setStatus(`Searching 0 of ${availableItemCount} volume/item(s)...`, "info");
+
+    resultsHeading.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+  });
+
+  activeSearchSource.addEventListener("progress", (event) => {
+    const data = JSON.parse(event.data);
+
+    searchedItemCount = data.searched_item_count;
+    availableItemCount = data.available_item_count;
+    matchingItemCount = data.matching_item_count;
+    totalMatches = data.total_matches;
+
+    setStatus(
+      `Searched ${searchedItemCount} of ${availableItemCount} volume/item(s). ` +
+      `Found ${totalMatches} page match(es) so far.`,
+      "info"
+    );
+  });
+
+  activeSearchSource.addEventListener("item", (event) => {
+    const data = JSON.parse(event.data);
+
+    searchedItemCount = data.searched_item_count;
+    availableItemCount = data.available_item_count;
+    matchingItemCount = data.matching_item_count;
+    totalMatches = data.total_matches;
+
+    removeResultsPlaceholder();
+    resultsEl.appendChild(createItemCard(data.item));
+
+    setStatus(
+      `Searched ${searchedItemCount} of ${availableItemCount} volume/item(s). ` +
+      `Found ${totalMatches} page match(es) so far.`,
+      "info"
+    );
+  });
+
+  activeSearchSource.addEventListener("done", (event) => {
+    const data = JSON.parse(event.data);
+
+    searchedItemCount = data.searched_item_count;
+    availableItemCount = data.available_item_count;
+    matchingItemCount = data.matching_item_count;
+    totalMatches = data.total_matches;
+
+    if (titleData && matchingItemCount > 0) {
+      const titleBlock = document.createElement("div");
+      titleBlock.className = "mb-4";
+
+      const titleHeading = document.createElement("h3");
+      titleHeading.className = "h5";
+
+      if (titleData.title_url) {
+        titleHeading.appendChild(
+          createExternalLink(titleData.title_url, titleData.full_title || "BHL title")
+        );
+      } else {
+        titleHeading.textContent = titleData.full_title || "BHL title";
+      }
+
+      const summary = document.createElement("p");
+      summary.className = "text-body-secondary mb-0";
+      summary.textContent =
+        `Searched ${searchedItemCount} item(s). ` +
+        `Found ${totalMatches} page match(es) across ` +
+        `${matchingItemCount} item(s).`;
+
+      titleBlock.appendChild(titleHeading);
+      titleBlock.appendChild(summary);
+      resultsEl.prepend(titleBlock);
+    }
+
+    if (matchingItemCount === 0) {
       clearResults();
-      appendEmptyMessage(JSON.stringify(data, null, 2));
-      return;
+      appendEmptyMessage("No matching pages found.");
     }
 
     setStatus(
-      `Found ${data.total_matches} page match(es) across ${data.matching_item_count} item(s).`,
+      `Search complete. Found ${totalMatches} page match(es) across ${matchingItemCount} item(s).`,
       "success"
     );
 
-    renderResults(data);
     activateResultsStep();
-
-    resultsHeading.scrollIntoView({
-        behavior: "smooth",
-        block: "start"
-    });
-  } catch (error) {
-    setStatus("Search failed.", "danger");
-    clearResults();
-    appendEmptyMessage(String(error));
-  } finally {
     setLoading(false);
-  }
+
+    activeSearchSource.close();
+    activeSearchSource = null;
+  });
+
+  activeSearchSource.addEventListener("error", (event) => {
+    let message = "Search failed.";
+
+    if (event.data) {
+      try {
+        const data = JSON.parse(event.data);
+        message = data.message || message;
+      } catch {
+        // Keep the default message.
+      }
+    }
+
+    setStatus(message, "danger");
+    setLoading(false);
+
+    if (activeSearchSource) {
+      activeSearchSource.close();
+      activeSearchSource = null;
+    }
+  });
 });
 
 changeTitleButton.addEventListener("click", () => {
