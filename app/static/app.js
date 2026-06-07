@@ -4,24 +4,37 @@ const resultsEl = document.querySelector("#results");
 const searchButton = document.querySelector("#search-button");
 const searchSpinner = document.querySelector("#search-spinner");
 const searchButtonText = document.querySelector("#search-button-text");
+
 const titleLookupForm = document.querySelector("#title-lookup-form");
 const titleLookupResultsEl = document.querySelector("#title-lookup-results");
 const titleLookupButton = document.querySelector("#title-lookup-button");
 const titleIdInput = document.querySelector("#title-id");
+const titleLookupCollapseEl = document.querySelector("#title-lookup-collapse");
+const titleQueryInput = document.querySelector("#title-query");
+const titlePanel = document.querySelector("#title-panel");
+const titleStepBadge = document.querySelector("#title-step-badge");
+
 const selectedTitleHeading = document.querySelector("#selected-title-heading");
 const selectedTitleSummary = document.querySelector("#selected-title-summary");
-const titleLookupCollapseEl = document.querySelector("#title-lookup-collapse");
 const changeTitleButton = document.querySelector("#change-title-button");
-const titleQueryInput = document.querySelector("#title-query");
 const searchTextInput = document.querySelector("#text");
 const searchPanel = document.querySelector("#search-panel");
 const searchStepBadge = document.querySelector("#search-step-badge");
 const searchStepHelp = document.querySelector("#search-step-help");
+
 const resultsPanel = document.querySelector("#results-panel");
 const resultsStepBadge = document.querySelector("#results-step-badge");
 const resultsHeading = document.querySelector("#results-heading");
-const titlePanel = document.querySelector("#title-panel");
-const titleStepBadge = document.querySelector("#title-step-badge");
+
+const searchProgress = document.querySelector("#search-progress");
+const searchProgressLabel = document.querySelector("#search-progress-label");
+const searchProgressDetail = document.querySelector("#search-progress-detail");
+const searchProgressPercent = document.querySelector("#search-progress-percent");
+const searchProgressContainer = document.querySelector("#search-progress-container");
+const searchProgressBar = document.querySelector("#search-progress-bar");
+const latestMatch = document.querySelector("#latest-match");
+
+let activeSearchSource = null;
 
 function setStatus(message, type) {
   statusEl.textContent = message;
@@ -31,7 +44,7 @@ function setStatus(message, type) {
 function setLoading(isLoading) {
   searchButton.disabled = isLoading;
   searchSpinner.classList.toggle("d-none", !isLoading);
-  searchButtonText.textContent = isLoading ? "Searching..." : "Search";
+  searchButtonText.textContent = isLoading ? "Searching..." : "Search publication";
 }
 
 function clearResults() {
@@ -59,6 +72,59 @@ function removeResultsPlaceholder() {
   if (placeholder) {
     placeholder.remove();
   }
+}
+
+function resetSearchProgress() {
+  searchProgress.classList.add("d-none");
+  searchProgressLabel.textContent = "Searching volumes…";
+  searchProgressDetail.textContent = "Preparing search.";
+  searchProgressPercent.textContent = "0%";
+  latestMatch.textContent = "";
+
+  searchProgressContainer.setAttribute("aria-valuenow", "0");
+  searchProgressBar.style.width = "0%";
+  searchProgressBar.classList.add("progress-bar-striped", "progress-bar-animated");
+}
+
+function updateSearchProgress({
+  searchedItemCount,
+  availableItemCount,
+  totalMatches,
+  matchingItemCount,
+  latestMessage = "",
+  done = false,
+}) {
+  searchProgress.classList.remove("d-none");
+
+  const percent = availableItemCount > 0
+    ? Math.round((searchedItemCount / availableItemCount) * 100)
+    : 0;
+
+  searchProgressLabel.textContent = done
+    ? "Search complete"
+    : "Searching volumes…";
+
+  searchProgressDetail.textContent =
+    `Searched ${searchedItemCount} of ${availableItemCount} volume/item(s). ` +
+    `Found ${totalMatches} page match(es) across ${matchingItemCount} item(s).`;
+
+  searchProgressPercent.textContent = `${percent}%`;
+  searchProgressContainer.setAttribute("aria-valuenow", String(percent));
+  searchProgressBar.style.width = `${percent}%`;
+
+  if (latestMessage) {
+    latestMatch.textContent = latestMessage;
+  }
+
+  if (done) {
+    searchProgressBar.classList.remove("progress-bar-striped", "progress-bar-animated");
+  }
+}
+
+function markSearchProgressFailed() {
+  searchProgress.classList.remove("d-none");
+  searchProgressLabel.textContent = "Search stopped";
+  searchProgressBar.classList.remove("progress-bar-striped", "progress-bar-animated");
 }
 
 function createExternalLink(url, text) {
@@ -144,13 +210,15 @@ function createPageList(pages) {
 
     row.appendChild(links);
     item.appendChild(row);
-    list.appendChild(item);
+
     if (page.snippet) {
-        const snippet = document.createElement("p");
-        snippet.className = "mt-2 mb-0 small text-body-secondary";
-        appendHighlightedText(snippet, page.snippet, page.search_text);
-        item.appendChild(snippet);
+      const snippet = document.createElement("p");
+      snippet.className = "mt-2 mb-0 small text-body-secondary";
+      appendHighlightedText(snippet, page.snippet, page.search_text);
+      item.appendChild(snippet);
     }
+
+    list.appendChild(item);
   }
 
   return list;
@@ -202,42 +270,32 @@ function createItemCard(item) {
   return card;
 }
 
-function renderResults(data) {
-  clearResults();
-
-  if (!data.matching_items || data.matching_items.length === 0) {
-    appendEmptyMessage("No matching pages found.");
-    return;
-  }
-
+function createResultsTitleBlock(titleData, searchedItemCount, matchingItemCount, totalMatches) {
   const titleBlock = document.createElement("div");
   titleBlock.className = "mb-4";
 
   const titleHeading = document.createElement("h3");
   titleHeading.className = "h5";
 
-  if (data.title?.title_url) {
+  if (titleData?.title_url) {
     titleHeading.appendChild(
-      createExternalLink(data.title.title_url, data.title.full_title || "BHL title")
+      createExternalLink(titleData.title_url, titleData.full_title || "BHL title")
     );
   } else {
-    titleHeading.textContent = data.title?.full_title || "BHL title";
+    titleHeading.textContent = titleData?.full_title || "BHL title";
   }
 
   const summary = document.createElement("p");
   summary.className = "text-body-secondary mb-0";
   summary.textContent =
-    `Searched ${data.searched_item_count} item(s). ` +
-    `Found ${data.total_matches} page match(es) across ` +
-    `${data.matching_item_count} item(s).`;
+    `Searched ${searchedItemCount} item(s). ` +
+    `Found ${totalMatches} page match(es) across ` +
+    `${matchingItemCount} item(s).`;
 
   titleBlock.appendChild(titleHeading);
   titleBlock.appendChild(summary);
-  resultsEl.appendChild(titleBlock);
 
-  for (const item of data.matching_items) {
-    resultsEl.appendChild(createItemCard(item));
-  }
+  return titleBlock;
 }
 
 function getTitleLookupCollapse() {
@@ -295,7 +353,7 @@ function createTitleCandidateButton(candidate) {
 
   const meta = document.createElement("div");
   meta.className = "small text-body-secondary";
-  meta.textContent = `Title ID: ${candidate.title_id}`;
+  meta.textContent = `Title number: ${candidate.title_id}`;
 
   button.appendChild(title);
 
@@ -311,19 +369,26 @@ function createTitleCandidateButton(candidate) {
 
     setStatus("Title selected. Enter search text below and run the search.", "success");
 
-    titleLookupCollapseEl.addEventListener(
+    if (titleLookupCollapseEl.classList.contains("show")) {
+      titleLookupCollapseEl.addEventListener(
         "hidden.bs.collapse",
         () => {
-        selectedTitleHeading.scrollIntoView({
+          selectedTitleHeading.scrollIntoView({
             behavior: "smooth",
             block: "start"
-        });
+          });
         },
         { once: true }
-    );
+      );
 
-    hideTitleLookupResults();
- });
+      hideTitleLookupResults();
+    } else {
+      selectedTitleHeading.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    }
+  });
 
   return button;
 }
@@ -355,6 +420,7 @@ function setActiveWorkflowStep(step) {
 
   titlePanel.classList.toggle("border-primary", titleIsActive);
   titlePanel.classList.toggle("border-secondary-subtle", !titleIsActive);
+
   titleStepBadge.className = titleIsActive
     ? "badge rounded-pill text-bg-primary fs-6"
     : "badge rounded-pill text-bg-success fs-6";
@@ -388,7 +454,7 @@ function showSelectedTitle(candidate) {
 
   const meta = document.createElement("div");
   meta.className = "small";
-  meta.textContent = `Selected BHL title ID: ${candidate.title_id}`;
+  meta.textContent = `Selected BHL title number: ${candidate.title_id}`;
 
   selectedTitleSummary.appendChild(title);
   selectedTitleSummary.appendChild(meta);
@@ -405,6 +471,7 @@ function activateResultsStep() {
 }
 
 setActiveWorkflowStep(1);
+resetSearchProgress();
 
 titleLookupForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -450,8 +517,6 @@ document.querySelectorAll(".example-search-text").forEach((button) => {
   });
 });
 
-let activeSearchSource = null;
-
 form.addEventListener("submit", (event) => {
   event.preventDefault();
 
@@ -474,6 +539,7 @@ form.addEventListener("submit", (event) => {
 
   setLoading(true);
   clearResults();
+  resetSearchProgress();
   setStatus("Starting search...", "info");
 
   activeSearchSource = new EventSource(`/api/bhl-title-search-stream?${params}`);
@@ -493,6 +559,13 @@ form.addEventListener("submit", (event) => {
     clearResults();
     appendResultsPlaceholder(`Searching ${availableItemCount} volume/item(s)...`);
 
+    updateSearchProgress({
+      searchedItemCount: 0,
+      availableItemCount,
+      totalMatches: 0,
+      matchingItemCount: 0,
+    });
+
     setStatus(`Searching 0 of ${availableItemCount} volume/item(s)...`, "info");
 
     resultsHeading.scrollIntoView({
@@ -508,6 +581,13 @@ form.addEventListener("submit", (event) => {
     availableItemCount = data.available_item_count;
     matchingItemCount = data.matching_item_count;
     totalMatches = data.total_matches;
+
+    updateSearchProgress({
+      searchedItemCount,
+      availableItemCount,
+      totalMatches,
+      matchingItemCount,
+    });
 
     setStatus(
       `Searched ${searchedItemCount} of ${availableItemCount} volume/item(s). ` +
@@ -527,6 +607,16 @@ form.addEventListener("submit", (event) => {
     removeResultsPlaceholder();
     resultsEl.appendChild(createItemCard(data.item));
 
+    const itemLabel = data.item.volume || data.item.year || `Item ${data.item.item_id}`;
+
+    updateSearchProgress({
+      searchedItemCount,
+      availableItemCount,
+      totalMatches,
+      matchingItemCount,
+      latestMessage: `Latest match: ${itemLabel} (${data.item.match_count} page match(es))`,
+    });
+
     setStatus(
       `Searched ${searchedItemCount} of ${availableItemCount} volume/item(s). ` +
       `Found ${totalMatches} page match(es) so far.`,
@@ -543,36 +633,28 @@ form.addEventListener("submit", (event) => {
     totalMatches = data.total_matches;
 
     if (titleData && matchingItemCount > 0) {
-      const titleBlock = document.createElement("div");
-      titleBlock.className = "mb-4";
-
-      const titleHeading = document.createElement("h3");
-      titleHeading.className = "h5";
-
-      if (titleData.title_url) {
-        titleHeading.appendChild(
-          createExternalLink(titleData.title_url, titleData.full_title || "BHL title")
-        );
-      } else {
-        titleHeading.textContent = titleData.full_title || "BHL title";
-      }
-
-      const summary = document.createElement("p");
-      summary.className = "text-body-secondary mb-0";
-      summary.textContent =
-        `Searched ${searchedItemCount} item(s). ` +
-        `Found ${totalMatches} page match(es) across ` +
-        `${matchingItemCount} item(s).`;
-
-      titleBlock.appendChild(titleHeading);
-      titleBlock.appendChild(summary);
-      resultsEl.prepend(titleBlock);
+      resultsEl.prepend(
+        createResultsTitleBlock(
+          titleData,
+          searchedItemCount,
+          matchingItemCount,
+          totalMatches
+        )
+      );
     }
 
     if (matchingItemCount === 0) {
       clearResults();
       appendEmptyMessage("No matching pages found.");
     }
+
+    updateSearchProgress({
+      searchedItemCount,
+      availableItemCount,
+      totalMatches,
+      matchingItemCount,
+      done: true,
+    });
 
     setStatus(
       `Search complete. Found ${totalMatches} page match(es) across ${matchingItemCount} item(s).`,
@@ -598,6 +680,7 @@ form.addEventListener("submit", (event) => {
       }
     }
 
+    markSearchProgressFailed();
     setStatus(message, "danger");
     setLoading(false);
 

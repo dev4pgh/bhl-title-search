@@ -15,7 +15,9 @@
             <div class="col-lg-10 col-xl-9">
                 <div class="mb-5 text-center">
                     <p class="text-uppercase text-primary fw-semibold small mb-2">
-                        Biodiversity Heritage Library
+                        <a href="https://www.biodiversitylibrary.org/" target="_blank"
+                            rel="noopener noreferrer">Biodiversity Heritage
+                            Library</a>
                     </p>
                     <h1 class="display-5 fw-semibold">Search across a publication</h1>
                     <p class="lead text-body-secondary mb-0">
@@ -150,6 +152,32 @@
                         <a href="/docs" class="small">API docs</a>
                     </div>
                     <div class="card-body">
+                        <div id="search-progress" class="d-none mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div>
+                                    <div id="search-progress-label" class="fw-semibold">
+                                        Searching volumes…
+                                    </div>
+                                    <div id="search-progress-detail" class="small text-body-secondary">
+                                        Preparing search.
+                                    </div>
+                                </div>
+                                <div id="search-progress-percent" class="fw-semibold">
+                                    0%
+                                </div>
+                            </div>
+
+                            <div id="search-progress-container" class="progress" role="progressbar"
+                                aria-label="BHL title search progress" aria-valuemin="0" aria-valuemax="100"
+                                aria-valuenow="0">
+                                <div id="search-progress-bar"
+                                    class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%">
+                                </div>
+                            </div>
+
+                            <div id="latest-match" class="small text-body-secondary mt-2"></div>
+                        </div>
+
                         <div id="status" class="alert alert-secondary" role="status" aria-live="polite">
                             Search results will appear here.
                         </div>
