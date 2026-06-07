@@ -14,6 +14,14 @@ const titleLookupCollapseEl = document.querySelector("#title-lookup-collapse");
 const changeTitleButton = document.querySelector("#change-title-button");
 const titleQueryInput = document.querySelector("#title-query");
 const searchTextInput = document.querySelector("#text");
+const searchPanel = document.querySelector("#search-panel");
+const searchStepBadge = document.querySelector("#search-step-badge");
+const searchStepHelp = document.querySelector("#search-step-help");
+const resultsPanel = document.querySelector("#results-panel");
+const resultsStepBadge = document.querySelector("#results-step-badge");
+const resultsHeading = document.querySelector("#results-heading");
+const titlePanel = document.querySelector("#title-panel");
+const titleStepBadge = document.querySelector("#title-step-badge");
 
 function setStatus(message, type) {
   statusEl.textContent = message;
@@ -324,6 +332,36 @@ function renderTitleCandidates(candidates) {
   }
 }
 
+function setActiveWorkflowStep(step) {
+  const titleIsActive = step === 1;
+  const searchIsActive = step === 2;
+  const resultsAreActive = step === 3;
+
+  titlePanel.classList.toggle("border-primary", titleIsActive);
+  titlePanel.classList.toggle("border-secondary-subtle", !titleIsActive);
+  titleStepBadge.className = titleIsActive
+    ? "badge rounded-pill text-bg-primary fs-6"
+    : "badge rounded-pill text-bg-success fs-6";
+
+  searchPanel.classList.toggle("border-primary", searchIsActive);
+  searchPanel.classList.toggle("border-secondary-subtle", !searchIsActive);
+  searchPanel.classList.toggle("bg-body-secondary", !searchIsActive);
+
+  searchStepBadge.className = searchIsActive
+    ? "badge rounded-pill text-bg-primary fs-6"
+    : step > 2
+      ? "badge rounded-pill text-bg-success fs-6"
+      : "badge rounded-pill text-bg-secondary fs-6";
+
+  resultsPanel.classList.toggle("border-primary", resultsAreActive);
+  resultsPanel.classList.toggle("border-secondary-subtle", !resultsAreActive);
+  resultsPanel.classList.toggle("bg-body-secondary", !resultsAreActive);
+
+  resultsStepBadge.className = resultsAreActive
+    ? "badge rounded-pill text-bg-primary"
+    : "badge rounded-pill text-bg-secondary";
+}
+
 function showSelectedTitle(candidate) {
   selectedTitleSummary.replaceChildren();
   selectedTitleSummary.className = "alert alert-success";
@@ -334,13 +372,23 @@ function showSelectedTitle(candidate) {
 
   const meta = document.createElement("div");
   meta.className = "small";
-  meta.textContent = `Selected title ID: ${candidate.title_id}`;
+  meta.textContent = `Selected BHL title ID: ${candidate.title_id}`;
 
   selectedTitleSummary.appendChild(title);
   selectedTitleSummary.appendChild(meta);
 
   changeTitleButton.classList.remove("d-none");
+
+  setActiveWorkflowStep(2);
+  searchStepHelp.textContent = "Enter the text you want to find across this publication’s volumes.";
+  searchButton.disabled = false;
 }
+
+function activateResultsStep() {
+  setActiveWorkflowStep(3);
+}
+
+setActiveWorkflowStep(1);
 
 titleLookupForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -423,6 +471,12 @@ form.addEventListener("submit", async (event) => {
     );
 
     renderResults(data);
+    activateResultsStep();
+
+    resultsHeading.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+    });
   } catch (error) {
     setStatus("Search failed.", "danger");
     clearResults();
@@ -433,6 +487,7 @@ form.addEventListener("submit", async (event) => {
 });
 
 changeTitleButton.addEventListener("click", () => {
+  setActiveWorkflowStep(1);
   showTitleLookupResults();
 
   titleLookupForm.scrollIntoView({

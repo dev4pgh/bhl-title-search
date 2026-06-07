@@ -12,27 +12,41 @@
 <body class="bg-body-tertiary">
     <main class="container py-5">
         <div class="row justify-content-center">
-            <div class="col-lg-9 col-xl-8">
-                <div class="mb-4">
-                    <h1 class="display-5 fw-semibold">BHL Title Search</h1>
-                    <p class="lead">
-                        Search across all volumes/items in a Biodiversity Heritage Library title.
+            <div class="col-lg-10 col-xl-9">
+                <div class="mb-5 text-center">
+                    <p class="text-uppercase text-primary fw-semibold small mb-2">
+                        Biodiversity Heritage Library
+                    </p>
+                    <h1 class="display-5 fw-semibold">Search across a publication</h1>
+                    <p class="lead text-body-secondary mb-0">
+                        Find a BHL publication, choose it, then search across all of its volumes.
                     </p>
                 </div>
 
-                <div class="card shadow-sm mb-4">
-                    <div class="card-body">
-                        <form id="title-lookup-form" class="mb-4">
-                            <label for="title-query" class="form-label">Find a BHL title</label>
-                            <div class="input-group">
+                <section id="title-panel" class="card shadow-sm mb-4 border-primary"
+                    aria-labelledby="find-title-heading">
+                    <div class="card-body p-4">
+                        <div class="d-flex gap-3 align-items-start mb-3">
+                            <span id="title-step-badge" class="badge rounded-pill text-bg-primary fs-6">1</span>
+                            <div>
+                                <h2 id="find-title-heading" class="h4 mb-1">Find a publication</h2>
+                                <p class="text-body-secondary mb-0">
+                                    Search BHL by publication title, then choose the title you want.
+                                </p>
+                            </div>
+                        </div>
+
+                        <form id="title-lookup-form" class="mb-3">
+                            <label for="title-query" class="form-label">Publication title</label>
+                            <div class="input-group input-group-lg">
                                 <input id="title-query" name="title" type="search" class="form-control"
                                     aria-describedby="title-query-help" autocomplete="off" required>
-                                <button id="title-lookup-button" type="submit" class="btn btn-outline-primary">
+                                <button id="title-lookup-button" type="submit" class="btn btn-primary">
                                     Find title
                                 </button>
                             </div>
                             <div id="title-query-help" class="form-text">
-                                Try a publication title such as
+                                Try
                                 <button type="button" class="btn btn-link btn-sm p-0 example-title"
                                     data-title="Proceedings of the California Academy of Sciences">
                                     Proceedings of the California Academy of Sciences
@@ -46,42 +60,51 @@
                         </form>
 
                         <div id="title-lookup-collapse" class="collapse">
-                            <div id="title-lookup-results" class="list-group mb-4"></div>
+                            <div id="title-lookup-results" class="list-group"></div>
                         </div>
+                    </div>
+                </section>
 
-                        <hr class="my-4">
-
-                        <h2 id="selected-title-heading" class="h5">Search within a publication</h2>
+                <section id="search-panel" class="card shadow-sm mb-4 border-secondary-subtle bg-body-secondary"
+                    aria-labelledby="selected-title-heading">
+                    <div class="card-body p-4">
+                        <div class="d-flex gap-3 align-items-start mb-3">
+                            <span id="search-step-badge" class="badge rounded-pill text-bg-secondary fs-6">2</span>
+                            <div>
+                                <h2 id="selected-title-heading" class="h4 mb-1">
+                                    Search within the selected publication
+                                </h2>
+                                <p id="search-step-help" class="text-body-secondary mb-0">
+                                    Choose a publication above to unlock this step.
+                                </p>
+                            </div>
+                        </div>
 
                         <div id="selected-title-summary" class="alert alert-secondary" role="status">
-                            Choose a BHL title above to begin, or use advanced options to enter a title ID directly.
+                            No publication selected yet.
                         </div>
 
-                        <button id="change-title-button" type="button"
-                            class="btn btn-sm btn-outline-secondary d-none mb-3">
-                            Change title
-                        </button>
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <button id="change-title-button" type="button"
+                                class="btn btn-sm btn-outline-secondary d-none">
+                                Change publication
+                            </button>
 
-                        <div class="accordion mb-3" id="advanced-title-id-accordion">
-                            <div class="accordion-item">
-                                <h3 class="accordion-header">
-                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                                        data-bs-target="#advanced-title-id" aria-expanded="false"
-                                        aria-controls="advanced-title-id">
-                                        Advanced: enter a BHL title ID directly
-                                    </button>
-                                </h3>
-                                <div id="advanced-title-id" class="accordion-collapse collapse"
-                                    data-bs-parent="#advanced-title-id-accordion">
-                                    <div class="accordion-body">
-                                        <label for="title-id" class="form-label">BHL title ID</label>
-                                        <input id="title-id" name="title_id" form="search-form" type="number"
-                                            class="form-control" value="{{ example_title_id }}"
-                                            aria-describedby="title-id-help" required>
-                                        <div id="title-id-help" class="form-text">
-                                            Use this if you already know the BHL bibliography/title ID.
-                                        </div>
-                                    </div>
+                            <button class="btn btn-sm btn-link text-decoration-none px-0" type="button"
+                                data-bs-toggle="collapse" data-bs-target="#advanced-title-id" aria-expanded="false"
+                                aria-controls="advanced-title-id">
+                                I already know the BHL title ID number
+                            </button>
+                        </div>
+
+                        <div id="advanced-title-id" class="collapse mb-3">
+                            <div class="border rounded bg-body p-3">
+                                <label for="title-id" class="form-label">BHL title ID</label>
+                                <input id="title-id" name="title_id" form="search-form" type="number"
+                                    class="form-control" value="{{ example_title_id }}" aria-describedby="title-id-help"
+                                    required>
+                                <div id="title-id-help" class="form-text">
+                                    Use this if you already know the BHL bibliography/title ID.
                                 </div>
                             </div>
                         </div>
@@ -89,37 +112,53 @@
                         <form id="search-form">
                             <div class="mb-3">
                                 <label for="text" class="form-label">Search text</label>
-                                <input id="text" name="text" type="search" class="form-control"
+                                <input id="text" name="text" type="search" class="form-control form-control-lg"
                                     value="{{ example_text }}" aria-describedby="search-text-help" required>
                                 <div id="search-text-help" class="form-text">
-                                    Enter a word or phrase to search across the selected publication’s volumes.
+                                    Try
+                                    <button type="button" class="btn btn-link btn-sm p-0 example-search-text"
+                                        data-text="orchid">
+                                        orchid
+                                    </button>,
+                                    <button type="button" class="btn btn-link btn-sm p-0 example-search-text"
+                                        data-text="domestic cat">
+                                        domestic cat
+                                    </button>, or
+                                    <button type="button" class="btn btn-link btn-sm p-0 example-search-text"
+                                        data-text="new species">
+                                        new species
+                                    </button>.
                                 </div>
                             </div>
 
-                            <button id="search-button" type="submit" class="btn btn-primary">
+                            <button id="search-button" type="submit" class="btn btn-primary btn-lg" disabled>
                                 <span id="search-spinner" class="spinner-border spinner-border-sm me-2 d-none"
                                     aria-hidden="true"></span>
-                                <span id="search-button-text">Search selected publication</span>
+                                <span id="search-button-text">Search publication</span>
                             </button>
                         </form>
                     </div>
-                </div>
+                </section>
 
-                <div id="status" class="alert alert-secondary" role="status" aria-live="polite">
-                    Submit a search to see results.
-                </div>
-
-                <div class="card shadow-sm">
+                <section id="results-panel" class="card shadow-sm border-secondary-subtle bg-body-secondary"
+                    aria-labelledby="results-heading">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h2 class="h5 mb-0">Results</h2>
+                        <div class="d-flex gap-2 align-items-center">
+                            <span id="results-step-badge" class="badge rounded-pill text-bg-secondary">3</span>
+                            <h2 id="results-heading" class="h5 mb-0">Results</h2>
+                        </div>
                         <a href="/docs" class="small">API docs</a>
                     </div>
                     <div class="card-body">
+                        <div id="status" class="alert alert-secondary" role="status" aria-live="polite">
+                            Search results will appear here.
+                        </div>
+
                         <div id="results">
                             <p class="text-body-secondary mb-0">No results yet.</p>
                         </div>
                     </div>
-                </div>
+                </section>
             </div>
         </div>
     </main>
